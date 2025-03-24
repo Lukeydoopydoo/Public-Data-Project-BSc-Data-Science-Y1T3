@@ -23,6 +23,22 @@ API Import File Names:
 **[API IMPORT] (River Parrett) Hydrology Flow API Data (15 Minute Historic Just The Stations Of Interest)**
 
 **[API IMPORT] (River Parrett) Hydrology Level API Data (15 Minute Historic Just The Stations Of Interest)**
+```
+# API URL to get water level stations on River Parrett.
+api_url = "http://environment.data.gov.uk/hydrology/id/stations.json"
+params = {"observedProperty": "waterLevel", "riverName": "River Parrett"}
+
+# Request data from the API using 'get'.
+response = rq.get(api_url, params=params)
+response.raise_for_status()  # Stop if there's an error and defines the error.
+stations = response.json().get("items", []) #Converts the response into a Python dictionary and gets the "items" key.
+
+# Extract relevant data into a list using list comprehension, checking it is a dictionary and is complete. 
+station_data = [{"Station Name": station.get("label"),"GUID": station.get("stationGuid"),"Latitude": station.get("lat"),"Longitude": station.get("long"),"River Served": station.get("riverName", "N/A"),"Catchment": station.get("catchmentName", "N/A")} for station in stations if isinstance(station, dict) and station.get("notation")]
+
+# Convert to DataFrame and save as CSV.
+df_stations = pd.DataFrame(station_data)
+```
 
 # Data Preprocessing 
 
