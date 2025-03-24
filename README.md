@@ -80,3 +80,75 @@ Preprocessing Files Names:
 **[PREPROCESSING] Warning Data**
 
 **[PREPROCESSING] Rainfall Data**
+
+Since preprocessing for water level, water flow, and rainfall data followed a similar approach, water flow data is presented here as a representative example.
+The data frame was loaded and followed by initial exploration of the data quality dimensions: completeness, uniqueness, consistency, timeliness, validity and accuracy. 
+
+![image](https://github.com/user-attachments/assets/78648f28-3fda-48be-8b04-04b670b127a6)
+
+During exploratory data analysis, I examined the distribution of values and quality flags to evaluate data reliability.
+
+![image](https://github.com/user-attachments/assets/643a5537-6bf6-4237-8d80-cbce53cdd69d)
+
+![image](https://github.com/user-attachments/assets/62ecb9ea-895e-4929-a015-40985d6e7fe2)
+
+![image](https://github.com/user-attachments/assets/7567dc4d-1364-414d-b786-27671b97a563)
+
+![image](https://github.com/user-attachments/assets/343197e0-703b-486b-82e9-cad18c7a69b2)
+
+In most cases, closer inspection of the data quality types supported retaining the data, as it appeared representative of the dataset overall. In these instances, the potential negative impact of outlier mitigation was judged to outweigh the benefits. Where data quality issues were more significant, time-series interpolation was applied to address them.
+
+![image](https://github.com/user-attachments/assets/60245360-3e91-4728-8409-ec6bcb8f071b)
+
+The 15-minute interval data was resampled to hourly and the water flow and level utilised the max reading to be representative over the hour whereas rainfall utilised the mean. 
+
+```warnings_df = warnings_df[warnings_df['id'] == "Flood_Warning_Areas.761"]
+
+warnings_df```
+
+I kept only the columns relevant to later steps. 
+
+![image](https://github.com/user-attachments/assets/039ae9b8-9e35-4d75-ac83-8e8a476081a6)
+
+The approach to Flood Warning Data differed in that it involved plotting the geometry after merging the Historic Flood Warning Data with the Flood Warning Areas, in order to assess the effects of any imperfect matches. While this step could technically be removed—since the geometry was only used with GeoPandas to identify the nearest Flood Warning Areas to my postcode—it has been retained. This is because it doesn’t affect the single area selected and keeps the workflow flexible for future development, where the geometry may become necessary.
+
+![image](https://github.com/user-attachments/assets/71abb440-89af-462b-9aef-961f54f1d762)
+
+I filtered the dataset for only the Flood Warning Area chosen.
+
+```# Convert the dateTime column to datetime.
+df['dateTime'] = pd.to_datetime(df['dateTime'])
+
+# Resample the data to hourly intervals and keeping the maximum flow value.
+df_hourly = df.resample('H', on='dateTime').max().reset_index()
+```
+I removed any flood messages which did not denote either the start or end of a warning.
+
+```
+warnings_df = warnings_df[~warnings_df['Message Type'].str.contains('Update', case=False, na=False)]
+warnings_df
+```
+I generated a full date range at hour frequency by making a new data frame with a date range and then merging the original data frame with this new data frame. 
+
+```
+warnings_df = warnings_df.copy()
+full_range = pd.date_range(warnings_df['Approved'].min(), warnings_df['Approved'].max(), freq='H')
+full_dates = pd.DataFrame({'Approved': full_range})
+warnings_df_filled = full_dates.merge(warnings_df, on='Approved', how='left')
+warnings_df_filled
+```
+I mapped the flood warnings to either 1 or 0 depending on whether a message was setting a warning or removing it. 
+
+```
+warnings_df_filled['daily_indicator'] = warnings_df_filled['Message Type'].map({'Flood Warning': 1, 'Remove Flood Warning': 0})
+```
+I then forward filled the new ‘daily_indicator’ column so that it was complete and kept only the columns needed for merging. 
+
+```
+warnings_df_filled = warnings_df_filled[['Approved', 'daily_indicator']]
+warnings_df_filled
+warnings_df_filled['daily_indicator'] = warnings_df_filled['daily_indicator'].ffill()
+```
+![image](https://github.com/user-attachments/assets/779b9122-45fa-4bfb-a551-de7bdf81dd1b)
+
+
