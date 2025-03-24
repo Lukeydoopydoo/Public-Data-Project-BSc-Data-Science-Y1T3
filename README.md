@@ -23,6 +23,8 @@ API Import File Names:
 **[API IMPORT] (River Parrett) Hydrology Flow API Data (15 Minute Historic Just The Stations Of Interest)**
 
 **[API IMPORT] (River Parrett) Hydrology Level API Data (15 Minute Historic Just The Stations Of Interest)**
+
+Example: Identification of stations on the River Parrett which provide water level data. 
 ```
 # API URL to get water level stations on River Parrett.
 api_url = "http://environment.data.gov.uk/hydrology/id/stations.json"
@@ -38,6 +40,29 @@ station_data = [{"Station Name": station.get("label"),"GUID": station.get("stati
 
 # Convert to DataFrame and save as CSV.
 df_stations = pd.DataFrame(station_data)
+```
+Example: Using the identified stations to return water level data from those stations with the specific parameters identified. 
+```
+#Initialise a list.
+readings = []
+
+# Loop over unique station GUIDs
+for guid in df_stations["GUID"].dropna().unique():
+    #API URL.
+    url = "http://environment.data.gov.uk/hydrology/data/readings.json"
+    #Parameters for the request. 
+    params = {"station": guid,"observedProperty": "waterLevel","periodName": "15min","mineq-date": "2019-12-19","max-date": "2024-11-25","_limit": 2000000}
+    #Parameters for the request. 
+    response = rq.get(url, params=params)
+    response.raise_for_status()  # Stop if there's an error and defines the error.
+    items = response.json().get("items", []) #Returns a Python dictionary of the items.
+    # Append readings to the list, adding the GUID for reference.
+    for item in items:
+        item["GUID"] = guid
+        readings.append(item)
+
+# Create a DataFrame from the collected readings.
+df_readings = pd.DataFrame(readings)
 ```
 
 # Data Preprocessing 
