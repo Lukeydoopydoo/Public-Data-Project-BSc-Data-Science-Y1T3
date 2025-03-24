@@ -24,7 +24,7 @@ API Import File Names:
 
 **[API IMPORT] (River Parrett) Hydrology Level API Data (15 Minute Historic Just The Stations Of Interest)**
 
-Example: Identification of stations on the River Parrett which provide water level data. 
+**Example:** Identification of stations on the River Parrett which provide water level data. 
 ```
 # API URL to get water level stations on River Parrett.
 api_url = "http://environment.data.gov.uk/hydrology/id/stations.json"
@@ -41,7 +41,7 @@ station_data = [{"Station Name": station.get("label"),"GUID": station.get("stati
 # Convert to DataFrame and save as CSV.
 df_stations = pd.DataFrame(station_data)
 ```
-Example: Using the identified stations to return water level data from those stations with the specific parameters identified. 
+**Example:** Using the identified stations to return water level data from those stations with the specific parameters identified. 
 ```
 #Initialise a list.
 readings = []
