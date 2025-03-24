@@ -88,11 +88,19 @@ The data frame was loaded and followed by initial exploration of the data qualit
 
 During exploratory data analysis, I examined the distribution of values and quality flags to evaluate data reliability.
 
+Firstly, I visualised the data over time and by the data quality type because this allowed me to identify trends, gaps, or inconsistencies in the dataset, assess the reliability of the data across different periods, and better understand how data quality may have influenced the recorded values.
+
 ![image](https://github.com/user-attachments/assets/643a5537-6bf6-4237-8d80-cbce53cdd69d)
+
+I then visualised the quality types in boxplots to highlight the distribution, spread, and potential outliers within each quality category, making it easier to compare their variability and assess whether lower-quality data might be skewing the results or introducing anomalies.
 
 ![image](https://github.com/user-attachments/assets/62ecb9ea-895e-4929-a015-40985d6e7fe2)
 
+I  used histograms to examine the frequency distribution of values, allowing for a clearer understanding of how the data is spread, whether it follows a normal distribution.
+
 ![image](https://github.com/user-attachments/assets/7567dc4d-1364-414d-b786-27671b97a563)
+
+Finally, I used descriptive statistics to summarise the central tendencies, dispersion, and overall characteristics of the data across different quality types, providing a quantitative basis for comparing them and supporting decisions about data reliability and potential preprocessing steps.
 
 ![image](https://github.com/user-attachments/assets/343197e0-703b-486b-82e9-cad18c7a69b2)
 
@@ -100,7 +108,7 @@ In most cases, closer inspection of the data quality types supported retaining t
 
 ![image](https://github.com/user-attachments/assets/60245360-3e91-4728-8409-ec6bcb8f071b)
 
-The 15-minute interval data was resampled to hourly and the water flow and level utilised the max reading to be representative over the hour whereas rainfall utilised the mean. 
+The 15-minute interval data was resampled to hourly and the water flow and level utilised the max reading to be representative over the hour whereas rainfall utilised the mean. I did this because maximum values for flow and level better capture peak conditions that are critical for flood analysis, while the mean is more appropriate for rainfall as it reflects the overall intensity over time, reducing the impact of short, extreme spikes.
 
 ```
 warnings_df = warnings_df[warnings_df['id'] == "Flood_Warning_Areas.761"]
@@ -108,7 +116,7 @@ warnings_df = warnings_df[warnings_df['id'] == "Flood_Warning_Areas.761"]
 warnings_df
 ```
 
-I kept only the columns relevant to later steps. 
+I kept only the columns relevant to later steps to streamline the dataset, reduce memory usage, and improve processing efficiency, ensuring that subsequent analyses and models are focused only on the most meaningful and necessary information.
 
 ![image](https://github.com/user-attachments/assets/039ae9b8-9e35-4d75-ac83-8e8a476081a6)
 
@@ -144,7 +152,7 @@ I mapped the flood warnings to either 1 or 0 depending on whether a message was 
 ```
 warnings_df_filled['daily_indicator'] = warnings_df_filled['Message Type'].map({'Flood Warning': 1, 'Remove Flood Warning': 0})
 ```
-I then forward filled the new ‘daily_indicator’ column so that it was complete and kept only the columns needed for merging. 
+I then forward filled the new ‘daily_indicator’ column so that it was complete and kept only the columns needed for merging, visualising the outcome.
 
 ```
 warnings_df_filled = warnings_df_filled[['Approved', 'daily_indicator']]
@@ -153,4 +161,23 @@ warnings_df_filled['daily_indicator'] = warnings_df_filled['daily_indicator'].ff
 ```
 ![image](https://github.com/user-attachments/assets/779b9122-45fa-4bfb-a551-de7bdf81dd1b)
 
+# Feature Engineering 
 
+I explored the correlation of features like flow and rainfall with the original water level dataset to inform the creation of features to be used in the final machine learning model. This helped identify which variables had the strongest relationships with water level changes, guiding the selection and engineering of predictive inputs. The example from the rainfall preprocessing file is below.
+
+Amongst other visualisations, I visualised the relationship between rainfall and water level rolling averages during the winter of 2023 to observe how short-term trends in rainfall influenced water levels over time, and to identify any lagged effects or patterns that could support feature engineering for the predictive model.
+
+![image](https://github.com/user-attachments/assets/fb6d3ff3-6bac-41b8-a914-a14531a23d05)
+
+I also calculated and visualised the correlation between rainfall over a series of lags and water level to identify how past rainfall events influenced current water levels, helping to determine the most informative lag intervals for feature creation and improving the temporal relevance of inputs to the machine learning model.
+
+![image](https://github.com/user-attachments/assets/0dc82618-980d-41d2-9395-8819fdff8c30)
+
+From this work, I created a number of features to use in the model: 
+
+```
+df_hourly['rainfall_cumulative_12h'] = df_hourly['rainfall'].rolling(window=12, min_periods=1).sum()
+df_hourly['rainfall_cumulative_3d'] = df_hourly['rainfall'].rolling(window=72, min_periods=1).sum()
+df_hourly['rainfall_cumulative_2w'] = df_hourly['rainfall'].rolling(window=336, min_periods=1).sum()
+```
+Much of this work exposed avenues of further development (discussed in the Next Steps section).
