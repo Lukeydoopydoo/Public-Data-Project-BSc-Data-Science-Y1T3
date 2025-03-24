@@ -102,9 +102,11 @@ In most cases, closer inspection of the data quality types supported retaining t
 
 The 15-minute interval data was resampled to hourly and the water flow and level utilised the max reading to be representative over the hour whereas rainfall utilised the mean. 
 
-```warnings_df = warnings_df[warnings_df['id'] == "Flood_Warning_Areas.761"]
+```
+warnings_df = warnings_df[warnings_df['id'] == "Flood_Warning_Areas.761"]
 
-warnings_df```
+warnings_df
+```
 
 I kept only the columns relevant to later steps. 
 
