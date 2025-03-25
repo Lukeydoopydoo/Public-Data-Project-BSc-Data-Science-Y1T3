@@ -81,7 +81,8 @@ Preprocessing Files Names:
 
 **[PREPROCESSING] Rainfall Data**
 
-Since preprocessing for water level, water flow, and rainfall data followed a similar approach, water flow data is presented here as a representative example.
+Since preprocessing for water level, water flow, and rainfall data followed a similar approach, water flow data is presented here as a representative example, although there will be differences in approach between the datasets; where these differences in approach are large, they are detailed in this README.
+
 The data frame was loaded and followed by initial exploration of the data quality dimensions: completeness, uniqueness, consistency, timeliness, validity and accuracy. 
 
 ![image](https://github.com/user-attachments/assets/78648f28-3fda-48be-8b04-04b670b127a6)
@@ -104,16 +105,17 @@ Finally, I used descriptive statistics to summarise the central tendencies, disp
 
 ![image](https://github.com/user-attachments/assets/343197e0-703b-486b-82e9-cad18c7a69b2)
 
-In most cases, closer inspection of the data quality types supported retaining the data, as it appeared representative of the dataset overall. In these instances, the potential negative impact of outlier mitigation was judged to outweigh the benefits. Where data quality issues were more significant, time-series interpolation was applied to address them.
+In most cases, closer inspection of the data quality types supported retaining the data, as it appeared representative of the dataset overall. In these instances, the potential negative impact of outlier mitigation was judged to outweigh the benefits. Where data quality issues were more significant, time-series interpolation was applied to address them after assessing the size of gaps in the data upon which the interpolation would be applied as interpolating over a large gap can introduce false or overly smooth values that don’t reflect real-world variation.
 
 ![image](https://github.com/user-attachments/assets/60245360-3e91-4728-8409-ec6bcb8f071b)
 
 The 15-minute interval data was resampled to hourly and the water flow and level utilised the max reading to be representative over the hour whereas rainfall utilised the mean. I did this because maximum values for flow and level better capture peak conditions that are critical for flood analysis, while the mean is more appropriate for rainfall as it reflects the overall intensity over time, reducing the impact of short, extreme spikes.
 
-```
-warnings_df = warnings_df[warnings_df['id'] == "Flood_Warning_Areas.761"]
+```# Convert the dateTime column to datetime.
+df['dateTime'] = pd.to_datetime(df['dateTime'])
 
-warnings_df
+# Resample the data to hourly intervals and keeping the maximum flow value.
+df_hourly = df.resample('H', on='dateTime').max().reset_index()
 ```
 
 I kept only the columns relevant to later steps to streamline the dataset, reduce memory usage, and improve processing efficiency, ensuring that subsequent analyses and models are focused only on the most meaningful and necessary information.
@@ -126,12 +128,11 @@ The approach to Flood Warning Data differed in that it involved plotting the geo
 
 I filtered the dataset for only the Flood Warning Area chosen.
 
-```# Convert the dateTime column to datetime.
-df['dateTime'] = pd.to_datetime(df['dateTime'])
-
-# Resample the data to hourly intervals and keeping the maximum flow value.
-df_hourly = df.resample('H', on='dateTime').max().reset_index()
 ```
+warnings_df = warnings_df[warnings_df['id'] == "Flood_Warning_Areas.761"]
+warnings_df
+```
+
 I removed any flood messages which did not denote either the start or end of a warning.
 
 ```
