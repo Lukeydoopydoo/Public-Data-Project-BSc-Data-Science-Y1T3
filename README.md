@@ -69,7 +69,7 @@ df_readings = pd.DataFrame(readings)
 
 As part of this project, each key data type — **Flow**, **Level**, **Rainfall**, and **Warning** — is handled in a dedicated preprocessing file. These files focus on the  exploration and preparation of the datasets, with the goal of cleaning the data and understanding how each can be transformed into useful features for the final machine learning model.
 
-The preprocessing steps include cleaning, exploring the impact of data quality types, checking for missing data, exploring outliers and engineering time-based features such as lag values, rolling averages, and cumulative measures. 
+The preprocessing steps include cleaning, exploring the impact of data quality types, checking for missing data, exploring outliers and engineering time-based features such as lag values, rolling averages, and cumulative measures.  I adopted an iterative approach to integrating my datasets, choosing to preprocess each one separately before combining them. This decision was driven by the need for modularity, clarity, and control throughout the data preparation process. Each dataset - such as rainfall, flow, river level, and flood warnings - contained unique structures, time resolutions, and quality considerations. By treating them as modular components, I was able to address data-specific issues in isolation, ensuring each was cleaned, validated, and understood before integration - undertaking engineering of the features in the preprocessing in some cases. This method also allowed me to evaluate the incremental impact of each dataset on model performance, making it easier to identify the value added by individual features. 
 
 Preprocessing Files Names: 
 
@@ -81,7 +81,7 @@ Preprocessing Files Names:
 
 **[PREPROCESSING] Rainfall Data**
 
-Since preprocessing for water level, water flow, and rainfall data followed a similar approach, water flow data is presented here as a representative example, although there will be differences in approach between the datasets; where these differences in approach are large, they are detailed in this README.
+Since preprocessing for water level, water flow, and rainfall data followed a similar approach, water flow data is presented here as a representative example, although there will be differences in approach between the datasets; where these differences in approach are significant, they are detailed in this README.
 
 The data frame was loaded and followed by initial exploration of the data quality dimensions: completeness, uniqueness, consistency, timeliness, validity and accuracy. For any dataset that had more than one station, this process was also undertaken per station.
 
