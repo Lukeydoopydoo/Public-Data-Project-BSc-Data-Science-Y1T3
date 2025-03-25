@@ -111,7 +111,8 @@ In most cases, closer inspection of the data quality types supported retaining t
 
 The 15-minute interval data was resampled to hourly and the water flow and level utilised the max reading to be representative over the hour whereas rainfall utilised the mean. I did this because maximum values for flow and level better capture peak conditions that are critical for flood analysis, while the mean is more appropriate for rainfall as it reflects the overall intensity over time, reducing the impact of short, extreme spikes.
 
-```# Convert the dateTime column to datetime.
+```
+# Convert the dateTime column to datetime.
 df['dateTime'] = pd.to_datetime(df['dateTime'])
 
 # Resample the data to hourly intervals and keeping the maximum flow value.
@@ -216,9 +217,9 @@ I also created tables of descriptive statistics for each station:
 
 ![image](https://github.com/user-attachments/assets/ec53f529-addc-473a-982b-a38d38c8b4be)
 
-The inference from the visuals and the descriptive statistics was that one of the rivers woudl contribute far more to the prediction of a flood warning event than the other. 
+The inference from the visuals and the descriptive statistics was that one of the rivers would contribute far more to the prediction of a flood warning event than the other. 
 
-I began with a logistic regression as a baseline and followed this with a random forest, visualising the feature importance of the two stations and confirming my previous thoughts. 
+I began with a logistic regression as a baseline and followed this with a random forest, visualising the feature importance of the two stations and confirming my previous thoughts.   
 
 ![image](https://github.com/user-attachments/assets/9e4c1b1f-49f0-4b89-a8ce-66955aff391d)
 
@@ -240,9 +241,36 @@ grid_search = GridSearchCV(estimator=rf,
                            verbose=1)
 ```
 
-Using the best model, I created a Partial Dependence Plot to visualise how individual features influence the model’s predictions, helping to interpret the relationships the Random Forest learned and to identify which features have the most significant impact on the likelihood of a flood warning being issued. One of the stations demonstrated a threshold relationship for flood prediction and the other station demonstrated a much more complex relationship. 
+Using the best model, I created a Partial Dependence Plot to visualise how individual features influence the model’s predictions, helping to interpret the relationships the Random Forest learned and to identify which features have the most significant impact on the likelihood of a flood warning being issued. One of the stations demonstrated a threshold relationship for flood prediction and the other station demonstrated a much more complex relationship. The decision was taken, after seeing the feature importance of later iterations of the model, that the station 'ce5176cf' should be removed.
 
 ![image](https://github.com/user-attachments/assets/b4d2e19d-1abe-4d01-8919-b2eb62e30573)
 
+I then used the water level data to create lag, rolling average and exponentially weighted moving average features:
+Level lag 1h & 2h: The river level an hour and two hours before. A high level in the recent past could be a warning sign of a future flood warning.
+Level rolling average 3h & 6h: Short-term averages of level, smoothing out spikes and representing sustained level changes.
+Level EWMA (3h, 6h, 9h, 12h, 24h): Exponentially Weighted Moving Average of level over various periods. These emphasise recent readings (for short spans) or capture longer trends (12–24h spans). A 24h EWMA, for instance, reflects the general level of the river over the past day.
 
+```
+#Create lagged features for the level column using 1, 2, and 6 hour lags
+level_warnings['lag_1h'] = level_warnings['7998bf73-641d-4084-b00c-ca6989f2ba2b level'].shift(1)
+level_warnings['lag_2h'] = level_warnings['7998bf73-641d-4084-b00c-ca6989f2ba2b level'].shift(2)
+
+
+# Define rolling window sizes in hours (up to 48 hours)
+rolling_windows_hours = [3, 6]
+
+# Create rolling average features for each window size
+for window in rolling_windows_hours:
+    col_name = f'rolling_avg_{window}h'
+    level_warnings[col_name] = level_warnings['7998bf73-641d-4084-b00c-ca6989f2ba2b level'].rolling(window=window).mean()
+
+# Apply Exponential Weighted Moving Average (EWMA) with various spans (in hours)
+ewma_spans = [3, 6, 24, 12, 9]
+for span in ewma_spans:
+    col_name = f'ewma_{span}h'
+    level_warnings[col_name] = level_warnings['7998bf73-641d-4084-b00c-ca6989f2ba2b level'].ewm(span=span, adjust=False).mean()
+
+level_warnings
+```
+This yielded the best results with these parameters for the Random Forest: {'class_weight': 'balanced', 'max_depth': None, 'min_samples_split': 5, 'n_estimators': 300}
 
