@@ -83,25 +83,25 @@ Preprocessing Files Names:
 
 Since preprocessing for water level, water flow, and rainfall data followed a similar approach, water flow data is presented here as a representative example, although there will be differences in approach between the datasets; where these differences in approach are large, they are detailed in this README.
 
-The data frame was loaded and followed by initial exploration of the data quality dimensions: completeness, uniqueness, consistency, timeliness, validity and accuracy. 
+The data frame was loaded and followed by initial exploration of the data quality dimensions: completeness, uniqueness, consistency, timeliness, validity and accuracy. For any dataset that had more than one station, this process was also undertaken per station.
 
 ![image](https://github.com/user-attachments/assets/78648f28-3fda-48be-8b04-04b670b127a6)
 
 During exploratory data analysis, I examined the distribution of values and quality flags to evaluate data reliability.
 
-Firstly, I visualised the data over time and by the data quality type because this allowed me to identify trends, gaps, or inconsistencies in the dataset, assess the reliability of the data across different periods, and better understand how data quality may have influenced the recorded values.
+Firstly, I visualised the data over time and by the data quality type because this allowed me to identify trends, gaps, or inconsistencies in the dataset, assess the reliability of the data across different periods, and better understand how data quality may have influenced the recorded values. For any dataset that had more than one station, this process was also undertaken per station.
 
 ![image](https://github.com/user-attachments/assets/643a5537-6bf6-4237-8d80-cbce53cdd69d)
 
-I then visualised the quality types in boxplots to highlight the distribution, spread, and potential outliers within each quality category, making it easier to compare their variability and assess whether lower-quality data might be skewing the results or introducing anomalies.
+I then visualised the quality types in boxplots to highlight the distribution, spread, and potential outliers within each quality category, making it easier to compare their variability and assess whether lower-quality data might be skewing the results or introducing anomalies. For any dataset that had more than one station, this process was also undertaken per station.
 
 ![image](https://github.com/user-attachments/assets/62ecb9ea-895e-4929-a015-40985d6e7fe2)
 
-I  used histograms to examine the frequency distribution of values, allowing for a clearer understanding of how the data is spread, whether it follows a normal distribution.
+I  used histograms to examine the frequency distribution of values, allowing for a clearer understanding of how the data is spread, whether it follows a normal distribution. In most cases, I also created separate histograms of the different data quality types to assess their distributions. For any dataset that had more than one station, this process was also undertaken per station.
 
 ![image](https://github.com/user-attachments/assets/7567dc4d-1364-414d-b786-27671b97a563)
 
-Finally, I used descriptive statistics to summarise the central tendencies, dispersion, and overall characteristics of the data across different quality types, providing a quantitative basis for comparing them and supporting decisions about data reliability and potential preprocessing steps.
+Finally, I used descriptive statistics to summarise the central tendencies, dispersion, and overall characteristics of the data across different quality types, providing a quantitative basis for comparing them and supporting decisions about data reliability and potential preprocessing steps. For any dataset that had more than one station, this process was also undertaken per station.
 
 ![image](https://github.com/user-attachments/assets/343197e0-703b-486b-82e9-cad18c7a69b2)
 
@@ -182,3 +182,67 @@ df_hourly['rainfall_cumulative_3d'] = df_hourly['rainfall'].rolling(window=72, m
 df_hourly['rainfall_cumulative_2w'] = df_hourly['rainfall'].rolling(window=336, min_periods=1).sum()
 ```
 Much of this work exposed avenues of further development (discussed in the Next Steps section).
+
+# Machine Learning 
+
+In this section, I will outline the iterative process toward creating the final model.
+
+I began with just level data over two stations, renaming the ‘value’ column to ‘level’ to aid in clarity. 
+```
+level.rename(columns={"value": "level"}, inplace=True)
+```
+I also pivoted the data by the two stations to explore their individual impact on the model. 
+```
+level = level.pivot(index="dateTime", columns="station", values="level")
+```
+I renamed the columns using a list comprehension to identify what data the stations were reporting, ready for later data merges.
+```
+level.columns = [f"{col} level" for col in level.columns]
+```
+The dataset for baseline modelling: 
+
+![image](https://github.com/user-attachments/assets/420b7fc7-c01b-4351-b1a7-b525765db228)
+
+I merged the dataset with the warning data on the date/time column using an 
+```
+level_warnings = new_warnings.merge(level, left_on='Approved', right_on='dateTime', how='inner')
+```
+I visualised the two stations and their water levels against a flood warning being issued to assess the relationships: 
+![image](https://github.com/user-attachments/assets/c28aba44-45ba-461b-bbcc-e6de9e5dbd7e)
+
+![image](https://github.com/user-attachments/assets/4a96b688-72d0-46d8-809b-017801f91fc1)
+
+I also created tables of descriptive statistics for each station: 
+
+![image](https://github.com/user-attachments/assets/ec53f529-addc-473a-982b-a38d38c8b4be)
+
+The inference from the visuals and the descriptive statistics was that one of the rivers woudl contribute far more to the prediction of a flood warning event than the other. 
+
+I began with a logistic regression as a baseline and followed this with a random forest, visualising the feature importance of the two stations and confirming my previous thoughts. 
+
+![image](https://github.com/user-attachments/assets/9e4c1b1f-49f0-4b89-a8ce-66955aff391d)
+
+I performed a GridSearchCV to tune the hyperparameters of the Random Forest model. The F1 score was used as the evaluation metric during grid search to balance the need for detecting floods (recall) with minimising false alarms (precision). Initially, I used StratifiedKFold for cross-validation; however, I later transitioned to TimeSeriesSplit to avoid data leakage, as StratifiedKFold can allow the model to peek into future data in time series contexts. This switch helped preserve temporal integrity but occasionally resulted in folds without any positive (flood) cases. In such cases, StratifiedKFold with no shuffling was used as a 'best-efforts' fallback approach. SMOTE was used to address class imbalance in the training data by synthetically generating new instances of the minority class but its results did not contribute positively to the model and so it was not used in future models.
+
+```
+param_grid = {
+    'n_estimators': [100, 200, 300],
+    'max_depth': [5, 10, 15, None],
+    'min_samples_split': [2, 5, 10],
+    'class_weight': ["balanced", "balanced_subsample"]  
+}
+
+grid_search = GridSearchCV(estimator=rf,
+                           param_grid=param_grid,
+                           cv=cv_strategy,
+                           scoring='f1',  
+                           n_jobs=-1,
+                           verbose=1)
+```
+
+Using the best model, I created a Partial Dependence Plot to visualise how individual features influence the model’s predictions, helping to interpret the relationships the Random Forest learned and to identify which features have the most significant impact on the likelihood of a flood warning being issued. One of the stations demonstrated a threshold relationship for flood prediction and the other station demonstrated a much more complex relationship. 
+
+![image](https://github.com/user-attachments/assets/b4d2e19d-1abe-4d01-8919-b2eb62e30573)
+
+
+
