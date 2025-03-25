@@ -272,5 +272,112 @@ for span in ewma_spans:
 
 level_warnings
 ```
-This yielded the best results with these parameters for the Random Forest: {'class_weight': 'balanced', 'max_depth': None, 'min_samples_split': 5, 'n_estimators': 300}
+This yielded a much stronger model:
+```
+Best Parameters: {'class_weight': 'balanced', 'max_depth': None, 'min_samples_split': 2, 'n_estimators': 100}
 
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00      7829
+           1       0.96      0.67      0.79        67
+
+    accuracy                           1.00      7896
+   macro avg       0.98      0.84      0.89      7896
+weighted avg       1.00      1.00      1.00      7896
+```
+The model relied heavily on EWMA and rolling averages, emphasising longer-term trends over sudden changes.This suggests that predicting flood warnings requires monitoring how water levels evolve over time, rather than just looking at individual readings and that there is not automation to the flood warnings. 
+
+![image](https://github.com/user-attachments/assets/bd1b5593-af0b-4340-8b0b-ecd713cc7bba)
+
+When examining the Partial Dependence Plot from this Random Forest model, the ewma_6h exhibits a sharp increase at around 1.2–1.3, suggesting a threshold effect where flood probability significantly rises past this level.Features like rolling_avg_6h and ewma_24h display a slight upward slope, indicating a weak positive correlation with flood probability.
+
+![image](https://github.com/user-attachments/assets/eda42013-c7f5-4ff9-b548-35ed78fd38ff)
+
+Merging the rainfall data created in the **[PREPROCESSING] Rainfall**, the following rainfall features were added to the model: 
+```
+'rainfall_cumulative_12h',
+ 'rainfall_cumulative_3d',
+ 'rainfall_cumulative_2w',
+ 'rainfall_2w_lagged']
+```
+The model result for the addition of the new features showed a marginally better balance between precision and recall: 
+```
+Best Parameters: {'class_weight': 'balanced', 'max_depth': None, 'min_samples_split': 5, 'n_estimators': 100}
+
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00      7829
+           1       0.94      0.70      0.80        67
+
+    accuracy                           1.00      7896
+   macro avg       0.97      0.85      0.90      7896
+weighted avg       1.00      1.00      1.00      7896
+```
+
+The feature importance of the rainfall features were low: 
+
+![image](https://github.com/user-attachments/assets/059baabe-ce3f-47dd-98db-aa891d2e2c56)
+
+Merging the water flow data, which had a high correlation with water level data, I engineered its features in the same way as the water level data previously.
+
+```
+#Create lagged features for the level column using 1, 2, and 6 hour lags.
+merged_df['flow lag_1h'] = merged_df['flow'].shift(1)
+merged_df['flow lag_2h'] = merged_df['flow'].shift(2)
+
+
+#Define rolling window sizes in hours (up to 48 hours).
+rolling_windows_hours = [3, 6]
+
+#Create rolling average features for each window size.
+for window in rolling_windows_hours:
+    col_name = f'flow_rolling_avg_{window}h'
+    merged_df[col_name] = merged_df['flow'].rolling(window=window).mean()
+
+#Apply Exponential Weighted Moving Average (EWMA) with various spans (in hours).
+ewma_spans = [3, 6, 24, 12, 9]
+for span in ewma_spans:
+    col_name = f'flow_ewma_{span}h'
+    merged_df[col_name] = merged_df['flow'].ewm(span=span, adjust=False).mean()
+
+merged_df
+```
+
+The final model yielded the greatest balance in precision and recall: 
+
+```
+Best Parameters: {'class_weight': 'balanced', 'max_depth': None, 'min_samples_split': 5, 'n_estimators': 300}
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00      7829
+           1       0.86      0.76      0.81        67
+
+    accuracy                           1.00      7896
+   macro avg       0.93      0.88      0.90      7896
+weighted avg       1.00      1.00      1.00      7896
+```
+After visualising the feature importances of the final model, I found that flow-based moving averages were  the strongest predictors, suggesting that floods were better signaled by long-term flow changes rather than just rainfall or water levels .Water level EWMAs remained important, but they take a secondary role compared to flow trends.
+
+![image](https://github.com/user-attachments/assets/44abb8a1-f7e0-4424-b2ce-b6be4b49aa3f)
+
+# Applying A Decision Tree
+
+This code trains a simple decision tree classifier to predict flood warnings using the most important features from the dataset. It then prints out the thresholds and conditions the model uses to classify whether a flood warning should be issued. From the decision tree, the thresholds for a flood warning are: flow_ewma_12h > 16.04, flow_ewma_3h > 17.86 (if others are moderate), rainfall_cumulative_3d > 12.69 mm ewma_6h / ewma_12h > 2.08 / 2.13.
+
+```
+#Train a simple Decision Tree on the top features to get the values for flood warnings. 
+dt_model = DecisionTreeClassifier(max_depth=4, random_state=42)
+dt_model.fit(X_train, y_train)
+
+#Extract the threhold values. 
+tree_rules = export_text(dt_model, feature_names=list(X_train.columns))
+print(tree_rules)
+```
+
+# Results
+
+Using only Environment Agency hydrology ensor data, the final Random Forest classification model achieved a much better balance between flood detection and false alarms compared to the initial baseline. Early on, a simple Logistic Regression yielded high overall accuracy but failed to catch many flood events due to extreme class imbalance. Replacing this with a Random Forest improved flood recall dramatically (catching around 90% of flood events in the baseline RF model) but initially at the cost of many false positives. Through class rebalancing and hyperparameter tuning, the model reached a more reasonable trade-off – after tuning, the Random Forest was able to identify about 84% of flood days while reducing false alarms (precision around 57% for flood class, up from 31% baseline). Incorporating additional features further boosted performance: adding cumulative rainfall data produced a model with roughly 0.73 recall and 0.79 precision for flood warnings (a notably more balanced outcome), and including river flow features pushed performance to its best levels. The final model (with levels, rainfall, and flow inputs) detects most flood warning hours while keeping the false-alarm rate relatively low, outperforming all previous versions with 0.88 precision and 0.76 recall and 0.82 F1.
+
+# Next Steps
+
+Given that some flood events are still missed, one immediate refinement is adjusting the classifier’s probability threshold. The current model uses the default 0.5 threshold to decide a “flood” warning. Lowering this threshold (e.g. to 0.4) could catch a few more flood events at the expense of more false positives. While the Random Forest has performed well, exploring other machine learning algorithms could yield further improvements. A natural next step is to try Gradient Boosting Machines such as XGBoost or LightGBM. Another avenue is to consider time-series specific models. Since flood warnings are inherently time-sequenced events, models like recurrent neural networks (LSTM/GRU) or sequence classification approaches could capture temporal patterns beyond the fixed lag features we engineered.
